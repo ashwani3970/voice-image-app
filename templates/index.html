@@ -69,21 +69,25 @@
 let recognition;
 let listening = false;
 
+// 🧠 Memory
+let lastResults = [];
+let currentIndex = 0;
+
 // 🖼 Show Image
 function showImage(file) {
     document.getElementById("image").src = "/image/" + file;
     document.getElementById("status").innerText = "Showing: " + file;
 }
 
-// 🔊 Voice response
+// 🔊 Voice
 function speak(text) {
+    window.speechSynthesis.cancel(); // prevent overlap
     const speech = new SpeechSynthesisUtterance(text);
     speech.lang = "en-US";
-    speech.rate = 1;
     window.speechSynthesis.speak(speech);
 }
 
-// 🧠 Extract product code intelligently
+// 🧠 Extract code
 function extractCode(text) {
     let cleaned = text.toUpperCase().replace(/ /g, "");
     let match = cleaned.match(/[A-Z0-9]{5,}/);
@@ -104,18 +108,24 @@ function liveSearch() {
     .then(data => {
         let html = "";
         data.results.forEach(file => {
-            html += `<div class="suggestion-item" onclick="showImage('${file}')">${file}</div>`;
+            html += `<div class="suggestion-item" onclick="selectFromList('${file}')">${file}</div>`;
         });
         document.getElementById("suggestions").innerHTML = html;
     });
 }
 
-// 🎤 Start continuous listening (AI upgraded)
+// 📌 Select from suggestion
+function selectFromList(file) {
+    lastResults = [file];
+    currentIndex = 0;
+    showImage(file);
+}
+
+// 🎤 Start listening
 function startContinuousListening() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
     recognition.continuous = true;
-    recognition.interimResults = false;
 
     listening = true;
     recognition.start();
@@ -125,23 +135,54 @@ function startContinuousListening() {
 
     recognition.onresult = function(event) {
         let text = event.results[event.results.length - 1][0].transcript;
-        console.log("User said:", text);
-
         let command = text.toUpperCase();
+
+        console.log("User:", command);
 
         // ❌ CLOSE
         if (command.includes("CLOSE")) {
             document.getElementById("image").src = "";
-            document.getElementById("status").innerText = "❌ Closed";
             speak("Image closed");
             return;
         }
 
-        // 🧠 Extract code automatically (no strict SHOW needed)
+        // ▶ NEXT
+        if (command.includes("NEXT")) {
+            if (lastResults.length > 0) {
+                currentIndex = (currentIndex + 1) % lastResults.length;
+                showImage(lastResults[currentIndex]);
+                speak("Next item");
+            }
+            return;
+        }
+
+        // ⏮ PREVIOUS
+        if (command.includes("PREVIOUS") || command.includes("BACK")) {
+            if (lastResults.length > 0) {
+                currentIndex = (currentIndex - 1 + lastResults.length) % lastResults.length;
+                showImage(lastResults[currentIndex]);
+                speak("Previous item");
+            }
+            return;
+        }
+
+        // 🔁 SIMILAR
+        if (command.includes("SIMILAR") || command.includes("OPTIONS")) {
+            if (lastResults.length > 1) {
+                currentIndex = 1;
+                showImage(lastResults[currentIndex]);
+                speak("Showing similar items");
+            } else {
+                speak("No similar items found");
+            }
+            return;
+        }
+
+        // 🧠 Extract code
         let code = extractCode(command);
 
         if (!code) {
-            speak("I did not understand the product code");
+            speak("I did not understand");
             return;
         }
 
@@ -151,15 +192,17 @@ function startContinuousListening() {
         .then(res => res.json())
         .then(data => {
             if (data.results.length > 0) {
-                showImage(data.results[0]);
+                lastResults = data.results;
+                currentIndex = 0;
 
-                if (data.results.length > 1) {
-                    speak("Showing best match. I also found similar items.");
+                showImage(lastResults[0]);
+
+                if (lastResults.length > 1) {
+                    speak("Showing best match. You can say next or similar");
                 } else {
                     speak("Opening " + code);
                 }
             } else {
-                document.getElementById("status").innerText = "❌ Not found";
                 speak("No product found");
             }
         });
@@ -179,7 +222,7 @@ function stopListening() {
     listening = false;
     recognition.stop();
     document.getElementById("micStatus").innerText = "Mic Off";
-    speak("Voice assistant stopped");
+    speak("Assistant stopped");
 }
 
 </script>
