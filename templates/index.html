@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Image Viewer</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        input {
+            padding: 10px;
+            width: 250px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            margin: 5px;
+        }
+
+        #suggestions {
+            margin-top: 10px;
+        }
+
+        .suggestion-item {
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .suggestion-item:hover {
+            background-color: #eee;
+        }
+
+        img {
+            margin-top: 20px;
+            max-width: 400px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>🎤 Voice Image Viewer</h2>
+
+<input type="text" id="searchBox" placeholder="Enter code" oninput="liveSearch()" />
+<button onclick="startListening()">🎤 Speak</button>
+
+<div id="suggestions"></div>
+
+<p id="status"></p>
+
+<img id="image" />
+
+<script>
+
+function showImage(file) {
+    document.getElementById("image").src = "/image/" + file;
+    document.getElementById("status").innerText = "Showing: " + file;
+}
+
+// 🔍 Live search suggestions
+function liveSearch() {
+    let query = document.getElementById("searchBox").value;
+
+    if (query.length < 2) {
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+
+    fetch("/search?q=" + query)
+    .then(res => res.json())
+    .then(data => {
+        let html = "";
+
+        data.results.forEach(file => {
+            html += `<div class="suggestion-item" onclick="showImage('${file}')">${file}</div>`;
+        });
+
+        document.getElementById("suggestions").innerHTML = html;
+    });
+}
+
+// 🎤 Voice
+function startListening() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = "en-US";
+
+    recognition.start();
+
+    document.getElementById("status").innerText = "🎤 Listening...";
+
+    recognition.onresult = function(event) {
+        let text = event.results[0][0].transcript;
+        let command = text.toUpperCase().replace(/ /g, "");
+
+        document.getElementById("searchBox").value = command;
+
+        if (command.includes("CLOSE")) {
+            document.getElementById("image").src = "";
+            document.getElementById("status").innerText = "❌ Closed";
+            return;
+        }
+
+        fetch("/search?q=" + command)
+        .then(res => res.json())
+        .then(data => {
+            if (data.results.length > 0) {
+                showImage(data.results[0]);
+            } else {
+                document.getElementById("status").innerText = "❌ Not found";
+            }
+        });
+    };
+}
+
+</script>
+
+</body>
+</html>
