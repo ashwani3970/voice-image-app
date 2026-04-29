@@ -69,9 +69,25 @@
 let recognition;
 let listening = false;
 
+// 🖼 Show Image
 function showImage(file) {
     document.getElementById("image").src = "/image/" + file;
     document.getElementById("status").innerText = "Showing: " + file;
+}
+
+// 🔊 Voice response
+function speak(text) {
+    const speech = new SpeechSynthesisUtterance(text);
+    speech.lang = "en-US";
+    speech.rate = 1;
+    window.speechSynthesis.speak(speech);
+}
+
+// 🧠 Extract product code intelligently
+function extractCode(text) {
+    let cleaned = text.toUpperCase().replace(/ /g, "");
+    let match = cleaned.match(/[A-Z0-9]{5,}/);
+    return match ? match[0] : null;
 }
 
 // 🔍 Suggestions
@@ -94,7 +110,7 @@ function liveSearch() {
     });
 }
 
-// 🎤 Start continuous listening
+// 🎤 Start continuous listening (AI upgraded)
 function startContinuousListening() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
@@ -105,50 +121,56 @@ function startContinuousListening() {
     recognition.start();
 
     document.getElementById("micStatus").innerText = "🎤 Listening...";
+    speak("Voice assistant activated");
 
     recognition.onresult = function(event) {
         let text = event.results[event.results.length - 1][0].transcript;
-        let command = text.toUpperCase().replace(/ /g, "");
+        console.log("User said:", text);
 
-        console.log("Heard:", command);
+        let command = text.toUpperCase();
 
-        // CLOSE
+        // ❌ CLOSE
         if (command.includes("CLOSE")) {
             document.getElementById("image").src = "";
             document.getElementById("status").innerText = "❌ Closed";
+            speak("Image closed");
             return;
         }
 
-        // WAKE WORD: SHOW
-        if (!command.includes("SHOW")) {
-            return; // ignore random speech
+        // 🧠 Extract code automatically (no strict SHOW needed)
+        let code = extractCode(command);
+
+        if (!code) {
+            speak("I did not understand the product code");
+            return;
         }
 
-        command = command.replace("SHOW", "");
+        document.getElementById("searchBox").value = code;
 
-        document.getElementById("searchBox").value = command;
-
-        fetch("/search?q=" + command)
+        fetch("/search?q=" + code)
         .then(res => res.json())
         .then(data => {
             if (data.results.length > 0) {
                 showImage(data.results[0]);
+
+                if (data.results.length > 1) {
+                    speak("Showing best match. I also found similar items.");
+                } else {
+                    speak("Opening " + code);
+                }
             } else {
                 document.getElementById("status").innerText = "❌ Not found";
+                speak("No product found");
             }
         });
     };
 
     recognition.onerror = function() {
-        if (listening) {
-            recognition.start(); // auto-restart
-        }
+        if (listening) recognition.start();
     };
 
     recognition.onend = function() {
-        if (listening) {
-            recognition.start(); // keep alive
-        }
+        if (listening) recognition.start();
     };
 }
 
@@ -157,6 +179,7 @@ function stopListening() {
     listening = false;
     recognition.stop();
     document.getElementById("micStatus").innerText = "Mic Off";
+    speak("Voice assistant stopped");
 }
 
 </script>
