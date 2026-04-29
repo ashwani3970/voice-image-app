@@ -39,6 +39,11 @@
             margin-top: 20px;
             max-width: 400px;
         }
+
+        #micStatus {
+            font-weight: bold;
+            color: green;
+        }
     </style>
 </head>
 
@@ -47,7 +52,11 @@
 <h2>🎤 Voice Image Viewer</h2>
 
 <input type="text" id="searchBox" placeholder="Enter code" oninput="liveSearch()" />
-<button onclick="startListening()">🎤 Speak</button>
+
+<button onclick="startContinuousListening()">▶ Start Listening</button>
+<button onclick="stopListening()">⏹ Stop</button>
+
+<p id="micStatus">Mic Off</p>
 
 <div id="suggestions"></div>
 
@@ -57,12 +66,15 @@
 
 <script>
 
+let recognition;
+let listening = false;
+
 function showImage(file) {
     document.getElementById("image").src = "/image/" + file;
     document.getElementById("status").innerText = "Showing: " + file;
 }
 
-// 🔍 Live search suggestions
+// 🔍 Suggestions
 function liveSearch() {
     let query = document.getElementById("searchBox").value;
 
@@ -75,35 +87,46 @@ function liveSearch() {
     .then(res => res.json())
     .then(data => {
         let html = "";
-
         data.results.forEach(file => {
             html += `<div class="suggestion-item" onclick="showImage('${file}')">${file}</div>`;
         });
-
         document.getElementById("suggestions").innerHTML = html;
     });
 }
 
-// 🎤 Voice
-function startListening() {
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+// 🎤 Start continuous listening
+function startContinuousListening() {
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = false;
 
+    listening = true;
     recognition.start();
 
-    document.getElementById("status").innerText = "🎤 Listening...";
+    document.getElementById("micStatus").innerText = "🎤 Listening...";
 
     recognition.onresult = function(event) {
-        let text = event.results[0][0].transcript;
+        let text = event.results[event.results.length - 1][0].transcript;
         let command = text.toUpperCase().replace(/ /g, "");
 
-        document.getElementById("searchBox").value = command;
+        console.log("Heard:", command);
 
+        // CLOSE
         if (command.includes("CLOSE")) {
             document.getElementById("image").src = "";
             document.getElementById("status").innerText = "❌ Closed";
             return;
         }
+
+        // WAKE WORD: SHOW
+        if (!command.includes("SHOW")) {
+            return; // ignore random speech
+        }
+
+        command = command.replace("SHOW", "");
+
+        document.getElementById("searchBox").value = command;
 
         fetch("/search?q=" + command)
         .then(res => res.json())
@@ -115,6 +138,25 @@ function startListening() {
             }
         });
     };
+
+    recognition.onerror = function() {
+        if (listening) {
+            recognition.start(); // auto-restart
+        }
+    };
+
+    recognition.onend = function() {
+        if (listening) {
+            recognition.start(); // keep alive
+        }
+    };
+}
+
+// ⏹ Stop
+function stopListening() {
+    listening = false;
+    recognition.stop();
+    document.getElementById("micStatus").innerText = "Mic Off";
 }
 
 </script>
