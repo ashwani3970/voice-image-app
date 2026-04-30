@@ -1,100 +1,177 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Voice Image Viewer</title>
+    <title>Voice Image Viewer Pro</title>
 
     <style>
         body {
-            font-family: Arial;
+            font-family: 'Segoe UI', Arial;
+            background: #f4f6f9;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             text-align: center;
-            margin-top: 40px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
         }
 
         input {
-            padding: 10px;
-            width: 250px;
+            padding: 12px;
+            width: 70%;
             font-size: 16px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
         }
 
         button {
             padding: 10px 15px;
-            font-size: 16px;
+            font-size: 15px;
             margin: 5px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        #micStatus {
+            margin-top: 10px;
+            font-weight: bold;
         }
 
         #suggestions {
             margin-top: 10px;
+            text-align: left;
         }
 
         .suggestion-item {
+            padding: 8px;
             cursor: pointer;
-            padding: 5px;
+            border-bottom: 1px solid #eee;
         }
 
         .suggestion-item:hover {
-            background-color: #eee;
+            background: #f1f1f1;
+        }
+
+        .image-box {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 10px;
+            background: #fafafa;
+            border: 1px solid #eee;
         }
 
         img {
-            margin-top: 20px;
-            max-width: 400px;
+            max-width: 100%;
+            border-radius: 8px;
         }
 
-        #micStatus {
-            font-weight: bold;
-            color: green;
+        #loaderScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .spinner {
+            border: 5px solid #eee;
+            border-top: 5px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-top: 10px;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 
 <body>
 
-<h2>🎤 Voice Image Viewer</h2>
+<!-- Loader -->
+<div id="loaderScreen">
+    <h2>🚀 Voice Image Viewer</h2>
+    <p id="loadingText">Initializing...</p>
+    <div class="spinner"></div>
+</div>
 
-<input type="text" id="searchBox" placeholder="Enter code" oninput="liveSearch()" />
+<div class="container">
 
-<button onclick="startContinuousListening()">▶ Start Listening</button>
-<button onclick="stopListening()">⏹ Stop</button>
+    <h2>🎤 Voice Image Viewer</h2>
 
-<p id="micStatus">Mic Off</p>
+    <input type="text" id="searchBox" placeholder="Enter or speak product code..." oninput="liveSearch()" />
 
-<div id="suggestions"></div>
+    <br>
 
-<p id="status"></p>
+    <button class="btn-start" onclick="startContinuousListening()">▶ Start</button>
+    <button class="btn-stop" onclick="stopListening()">⏹ Stop</button>
 
-<img id="image" />
+    <p id="micStatus">Mic Off</p>
+
+    <div id="suggestions"></div>
+
+    <p id="status"></p>
+
+    <div class="image-box">
+        <img id="image" />
+    </div>
+
+</div>
 
 <script>
 
 let recognition;
 let listening = false;
 
-// 🧠 Memory
 let lastResults = [];
 let currentIndex = 0;
 
-// 🖼 Show Image
 function showImage(file) {
     document.getElementById("image").src = "/image/" + file;
     document.getElementById("status").innerText = "Showing: " + file;
 }
 
-// 🔊 Voice
 function speak(text) {
-    window.speechSynthesis.cancel(); // prevent overlap
+    window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(text);
     speech.lang = "en-US";
     window.speechSynthesis.speak(speech);
 }
 
-// 🧠 Extract code
 function extractCode(text) {
     let cleaned = text.toUpperCase().replace(/ /g, "");
     let match = cleaned.match(/[A-Z0-9]{5,}/);
     return match ? match[0] : null;
 }
 
-// 🔍 Suggestions
 function liveSearch() {
     let query = document.getElementById("searchBox").value;
 
@@ -114,39 +191,32 @@ function liveSearch() {
     });
 }
 
-// 📌 Select from suggestion
 function selectFromList(file) {
     lastResults = [file];
     currentIndex = 0;
     showImage(file);
 }
 
-// 🎤 Start listening
 function startContinuousListening() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = "en-US";
     recognition.continuous = true;
 
     listening = true;
     recognition.start();
 
     document.getElementById("micStatus").innerText = "🎤 Listening...";
-    speak("Voice assistant activated");
+    speak("Assistant activated");
 
     recognition.onresult = function(event) {
         let text = event.results[event.results.length - 1][0].transcript;
         let command = text.toUpperCase();
 
-        console.log("User:", command);
-
-        // ❌ CLOSE
         if (command.includes("CLOSE")) {
             document.getElementById("image").src = "";
-            speak("Image closed");
+            speak("Closed");
             return;
         }
 
-        // ▶ NEXT
         if (command.includes("NEXT")) {
             if (lastResults.length > 0) {
                 currentIndex = (currentIndex + 1) % lastResults.length;
@@ -156,8 +226,7 @@ function startContinuousListening() {
             return;
         }
 
-        // ⏮ PREVIOUS
-        if (command.includes("PREVIOUS") || command.includes("BACK")) {
+        if (command.includes("PREVIOUS")) {
             if (lastResults.length > 0) {
                 currentIndex = (currentIndex - 1 + lastResults.length) % lastResults.length;
                 showImage(lastResults[currentIndex]);
@@ -166,25 +235,8 @@ function startContinuousListening() {
             return;
         }
 
-        // 🔁 SIMILAR
-        if (command.includes("SIMILAR") || command.includes("OPTIONS")) {
-            if (lastResults.length > 1) {
-                currentIndex = 1;
-                showImage(lastResults[currentIndex]);
-                speak("Showing similar items");
-            } else {
-                speak("No similar items found");
-            }
-            return;
-        }
-
-        // 🧠 Extract code
         let code = extractCode(command);
-
-        if (!code) {
-            speak("I did not understand");
-            return;
-        }
+        if (!code) return;
 
         document.getElementById("searchBox").value = code;
 
@@ -194,36 +246,43 @@ function startContinuousListening() {
             if (data.results.length > 0) {
                 lastResults = data.results;
                 currentIndex = 0;
-
                 showImage(lastResults[0]);
-
-                if (lastResults.length > 1) {
-                    speak("Showing best match. You can say next or similar");
-                } else {
-                    speak("Opening " + code);
-                }
+                speak("Showing result");
             } else {
-                speak("No product found");
+                speak("Not found");
             }
         });
     };
 
-    recognition.onerror = function() {
-        if (listening) recognition.start();
-    };
-
-    recognition.onend = function() {
-        if (listening) recognition.start();
-    };
+    recognition.onend = () => { if (listening) recognition.start(); };
 }
 
-// ⏹ Stop
 function stopListening() {
     listening = false;
     recognition.stop();
     document.getElementById("micStatus").innerText = "Mic Off";
-    speak("Assistant stopped");
+    speak("Stopped");
 }
+
+function waitForAppReady() {
+    fetch("/search?q=test")
+    .then(() => {
+        document.getElementById("loaderScreen").style.display = "none";
+        speak("System ready");
+    })
+    .catch(() => {
+        setTimeout(waitForAppReady, 1000);
+    });
+}
+
+let messages = ["Loading engine...", "Preparing data...", "Almost ready..."];
+let i = 0;
+setInterval(() => {
+    document.getElementById("loadingText").innerText = messages[i % messages.length];
+    i++;
+}, 1500);
+
+window.onload = waitForAppReady;
 
 </script>
 
