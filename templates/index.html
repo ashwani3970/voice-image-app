@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Voice Image Viewer Pro</title>
+    <title>Product Voice Viewer</title>
 
     <style>
         body {
@@ -11,7 +11,7 @@
         }
 
         .container {
-            max-width: 700px;
+            max-width: 600px;
             margin: 40px auto;
             background: white;
             padding: 30px;
@@ -20,13 +20,18 @@
             text-align: center;
         }
 
+        .logo {
+            height: 50px;
+            margin-bottom: 10px;
+        }
+
         h2 {
             margin-bottom: 20px;
         }
 
         input {
             padding: 12px;
-            width: 70%;
+            width: 80%;
             font-size: 16px;
             border-radius: 8px;
             border: 1px solid #ddd;
@@ -54,21 +59,6 @@
         #micStatus {
             margin-top: 10px;
             font-weight: bold;
-        }
-
-        #suggestions {
-            margin-top: 10px;
-            text-align: left;
-        }
-
-        .suggestion-item {
-            padding: 8px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-        }
-
-        .suggestion-item:hover {
-            background: #f1f1f1;
         }
 
         .image-box {
@@ -118,25 +108,26 @@
 
 <!-- Loader -->
 <div id="loaderScreen">
-    <h2>🚀 Voice Image Viewer</h2>
-    <p id="loadingText">Initializing...</p>
+    <h2 id="appName">🚀 Product Voice Viewer</h2>
+    <p id="loadingText">Starting system...</p>
     <div class="spinner"></div>
 </div>
 
 <div class="container">
 
-    <h2>🎤 Voice Image Viewer</h2>
+    <!-- 🔷 BRANDING -->
+    <img src="/static/logo.png" class="logo" alt="Logo">
 
-    <input type="text" id="searchBox" placeholder="Enter or speak product code..." oninput="liveSearch()" />
+    <h2 id="appTitle">Product Voice Viewer</h2>
+
+    <input type="text" id="searchBox" placeholder="Enter or speak product code..." />
 
     <br>
 
-    <button class="btn-start" onclick="startContinuousListening()">▶ Start</button>
+    <button class="btn-start" onclick="startListening()">▶ Start</button>
     <button class="btn-stop" onclick="stopListening()">⏹ Stop</button>
 
     <p id="micStatus">Mic Off</p>
-
-    <div id="suggestions"></div>
 
     <p id="status"></p>
 
@@ -148,17 +139,17 @@
 
 <script>
 
+// 🔧 CONFIG (Change this anytime)
+const APP_NAME = "My Retail Assistant"; // 🔥 change name here
+
+document.getElementById("appTitle").innerText = APP_NAME;
+document.getElementById("appName").innerText = "🚀 " + APP_NAME;
+
+// 🎤
 let recognition;
 let listening = false;
 
-let lastResults = [];
-let currentIndex = 0;
-
-function showImage(file) {
-    document.getElementById("image").src = "/image/" + file;
-    document.getElementById("status").innerText = "Showing: " + file;
-}
-
+// 🔊 voice
 function speak(text) {
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(text);
@@ -166,38 +157,21 @@ function speak(text) {
     window.speechSynthesis.speak(speech);
 }
 
+// 🧠 extract code
 function extractCode(text) {
     let cleaned = text.toUpperCase().replace(/ /g, "");
     let match = cleaned.match(/[A-Z0-9]{5,}/);
     return match ? match[0] : null;
 }
 
-function liveSearch() {
-    let query = document.getElementById("searchBox").value;
-
-    if (query.length < 2) {
-        document.getElementById("suggestions").innerHTML = "";
-        return;
-    }
-
-    fetch("/search?q=" + query)
-    .then(res => res.json())
-    .then(data => {
-        let html = "";
-        data.results.forEach(file => {
-            html += `<div class="suggestion-item" onclick="selectFromList('${file}')">${file}</div>`;
-        });
-        document.getElementById("suggestions").innerHTML = html;
-    });
+// 🖼 show image
+function showImage(file) {
+    document.getElementById("image").src = "/image/" + file;
+    document.getElementById("status").innerText = "Showing: " + file;
 }
 
-function selectFromList(file) {
-    lastResults = [file];
-    currentIndex = 0;
-    showImage(file);
-}
-
-function startContinuousListening() {
+// 🎤 start
+function startListening() {
     recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     recognition.continuous = true;
 
@@ -205,7 +179,7 @@ function startContinuousListening() {
     recognition.start();
 
     document.getElementById("micStatus").innerText = "🎤 Listening...";
-    speak("Assistant activated");
+    speak("Assistant ready");
 
     recognition.onresult = function(event) {
         let text = event.results[event.results.length - 1][0].transcript;
@@ -217,26 +191,12 @@ function startContinuousListening() {
             return;
         }
 
-        if (command.includes("NEXT")) {
-            if (lastResults.length > 0) {
-                currentIndex = (currentIndex + 1) % lastResults.length;
-                showImage(lastResults[currentIndex]);
-                speak("Next item");
-            }
-            return;
-        }
-
-        if (command.includes("PREVIOUS")) {
-            if (lastResults.length > 0) {
-                currentIndex = (currentIndex - 1 + lastResults.length) % lastResults.length;
-                showImage(lastResults[currentIndex]);
-                speak("Previous item");
-            }
-            return;
-        }
-
         let code = extractCode(command);
-        if (!code) return;
+
+        if (!code) {
+            speak("Please say the product code clearly");
+            return;
+        }
 
         document.getElementById("searchBox").value = code;
 
@@ -244,12 +204,10 @@ function startContinuousListening() {
         .then(res => res.json())
         .then(data => {
             if (data.results.length > 0) {
-                lastResults = data.results;
-                currentIndex = 0;
-                showImage(lastResults[0]);
-                speak("Showing result");
+                showImage(data.results[0]);
+                speak("Opening " + code);
             } else {
-                speak("Not found");
+                speak("Product not found");
             }
         });
     };
@@ -257,6 +215,7 @@ function startContinuousListening() {
     recognition.onend = () => { if (listening) recognition.start(); };
 }
 
+// ⏹ stop
 function stopListening() {
     listening = false;
     recognition.stop();
@@ -264,6 +223,7 @@ function stopListening() {
     speak("Stopped");
 }
 
+// 🚀 loader
 function waitForAppReady() {
     fetch("/search?q=test")
     .then(() => {
@@ -275,10 +235,11 @@ function waitForAppReady() {
     });
 }
 
-let messages = ["Loading engine...", "Preparing data...", "Almost ready..."];
+// dynamic loading text
+let msgs = ["Initializing system...", "Loading data...", "Almost ready..."];
 let i = 0;
 setInterval(() => {
-    document.getElementById("loadingText").innerText = messages[i % messages.length];
+    document.getElementById("loadingText").innerText = msgs[i % msgs.length];
     i++;
 }, 1500);
 
